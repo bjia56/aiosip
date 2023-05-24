@@ -370,6 +370,7 @@ class WSConnector(BaseConnector):
         except KeyError:
             websocket = await websockets.connect(f'ws{"s" if ssl else ""}://{peer_addr[0]}:{peer_addr[1]}', subprotocols=['sip'], **kwargs)
             local_addr = (utils.gen_str(12) + '.invalid', None)
+            self.local_addr = local_addr
             proto = WS(app=self._app, loop=self._loop,
                        local_addr=local_addr,
                        peer_addr=peer_addr,
