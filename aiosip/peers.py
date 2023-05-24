@@ -3,6 +3,7 @@ import asyncio
 import logging
 import ipaddress
 import websockets
+from urllib.parse import urlparse
 
 from multidict import CIMultiDict
 
@@ -184,14 +185,23 @@ class BaseConnector:
     async def create_server(self, local_addr, sock, **kwargs):
         return await self._create_server(local_addr, sock, **kwargs)
 
-    async def create_peer(self, peer_addr, local_addr=None, reuse_peer=True, **kwargs):
+    async def create_peer(self, peer_addr, local_addr=None, reuse_peer=True, force_ip=False, **kwargs):
         peer = None
 
-        try:
-            peer_addr = ipaddress.ip_address(peer_addr[0]).exploded, peer_addr[1]
-        except ValueError:
-            dns = await self._app.dns.query(peer_addr[0], 'A')
-            peer_addr = dns[0].host, peer_addr[1]
+        if force_ip:
+            if isinstance(peer_addr, tuple):
+                peer_host, peer_port = peer_addr
+            else:
+                uri = urlparse(peer_addr)
+                peer_host, peer_port = uri.hostname, uri.port
+
+            try:
+                peer_host = ipaddress.ip_address(peer_host).exploded
+            except ValueError:
+                dns = await self._app.dns.query(peer_host, 'A')
+                peer_host = dns[0].host
+
+            peer_addr = (peer_host, peer_port)
 
         if reuse_peer:
             peer = await self._find_peer(peer_addr, local_addr)
@@ -354,11 +364,11 @@ class UDPConnector(BaseConnector):
 
 
 class WSConnector(BaseConnector):
-    async def _create_connection(self, peer_addr, local_addr, **kwargs):
+    async def _create_connection(self, peer_addr, local_addr, ssl=True, **kwargs):
         try:
             return self._protocols[(peer_addr, local_addr)]
         except KeyError:
-            websocket = await websockets.connect(f'wss://{peer_addr[0]}:{peer_addr[1]}', subprotocols=['sip'], **kwargs)
+            websocket = await websockets.connect(f'ws{"s" if ssl else ""}://{peer_addr[0]}:{peer_addr[1]}', subprotocols=['sip'], **kwargs)
             local_addr = (utils.gen_str(12) + '.invalid', None)
             proto = WS(app=self._app, loop=self._loop,
                        local_addr=local_addr,
