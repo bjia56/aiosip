@@ -358,7 +358,7 @@ class WSConnector(BaseConnector):
         try:
             return self._protocols[(peer_addr, local_addr)]
         except KeyError:
-            websocket = await websockets.connect(f'ws://{peer_addr[0]}:{peer_addr[1]}', subprotocols=['sip'], **kwargs)
+            websocket = await websockets.connect(f'wss://{peer_addr[0]}:{peer_addr[1]}', subprotocols=['sip'], **kwargs)
             local_addr = (utils.gen_str(12) + '.invalid', None)
             proto = WS(app=self._app, loop=self._loop,
                        local_addr=local_addr,
